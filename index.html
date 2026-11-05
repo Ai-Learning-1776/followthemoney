@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Track what federal candidates raise and spend, using public FEC filings.">
+<title>Filed Money Tracker</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&display=swap">
+<style>
+/* Layout: a phone-first portfolio app. One column, bottom tabs, candidates presented as labeled slabs. */
+:root{
+  color-scheme:dark;
+  --bg:#0b1020;--surface:#141a2e;--raised:#1d2541;--line:#2b3454;
+  --ink:#eef1fa;--muted:#a3adc8;--accent:#ffc857;--accent-ink:#231a02;
+  --dem:#8db4ff;--rep:#ff9d8f;--ind:#c9bcff;--oth:#b8c2d6;
+  --display:"Bricolage Grotesque","Avenir Next","Segoe UI",sans-serif;
+  --body:"Figtree","Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0}img{max-width:100%}[hidden]{display:none!important}
+html,body{min-height:100%}
+body{background:var(--bg);color:var(--ink);font:400 15px/1.45 var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 calc(88px + env(safe-area-inset-bottom,0px))}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:680px;margin:0 auto;display:grid;gap:18px;padding-top:18px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{font:700 22px/1 var(--display);letter-spacing:-.02em}
+.brand span{color:var(--accent)}
+.stamp{font-size:12px;color:var(--muted);text-align:right}
+h1{font:700 44px/1.02 var(--display);letter-spacing:-.03em;margin:0;font-variant-numeric:tabular-nums}
+h2{font:700 18px/1.2 var(--display);margin:0;text-wrap:balance}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.delta{color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums}
+.sub{color:var(--muted);font-size:13px}
+.hero{display:grid;gap:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:500;color:var(--muted);min-height:34px}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.chart{position:relative;width:100%;touch-action:pan-y}
+.chart svg{display:block;width:100%}
+.chart text{fill:var(--muted);font:500 11px var(--body);font-variant-numeric:tabular-nums}
+.tip{position:absolute;top:0;pointer-events:none;background:var(--raised);border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.tip b{display:block;font-size:14px}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;border-block:1px solid var(--line);padding-block:12px}
+.stat{min-width:0}
+.stat .k{font-size:12px;color:var(--muted)}
+.stat .v{font:700 19px/1.2 var(--display);font-variant-numeric:tabular-nums}
+.section-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.list{display:grid;gap:2px}
+.row{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--line)}
+.row-open{display:contents;cursor:pointer}
+.tile{width:42px;height:52px;border-radius:6px;background:var(--raised);border:1px solid var(--line);display:grid;place-items:center;align-content:center;gap:2px;font:700 15px/1 var(--display)}
+.tile small{font:600 9px/1 var(--body);letter-spacing:.06em;color:var(--muted)}
+.who{min-width:0;background:none;border:0;padding:0;text-align:left;display:grid;gap:2px}
+.who strong{font-weight:600;overflow-wrap:anywhere}
+.meta{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.party{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:5px;font-size:11px;font-weight:700;color:var(--bg)}
+.party.DEM{background:var(--dem)}.party.REP{background:var(--rep)}.party.IND{background:var(--ind)}.party.OTH{background:var(--oth)}
+.amt{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.amt small{display:block;font-weight:400;font-size:12px;color:var(--muted)}
+.star{background:none;border:0;width:36px;height:44px;display:grid;place-items:center;color:var(--muted);padding:0}
+.star svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7}
+.star[aria-pressed="true"]{color:var(--accent)}
+.star[aria-pressed="true"] svg{fill:currentColor}
+.spark{display:block;width:64px;height:24px}
+.tools{display:grid;gap:10px}
+.field{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:44px}
+.selects{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.selects label{display:grid;gap:4px;font-size:12px;color:var(--muted);min-width:0}
+.bar{height:6px;background:var(--raised);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:0 3px 3px 0}
+.mover{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:4px 10px;padding:11px 0;border-bottom:1px solid var(--line);background:none;border-inline:0;border-top:0;width:100%;text-align:left;align-items:center}
+.mover .rank{color:var(--muted);font-variant-numeric:tabular-nums;font-size:13px}
+.mover .bar{grid-column:2/4}
+.note{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:13.5px;color:var(--muted)}
+.prose{display:grid;gap:18px;max-width:65ch}
+.prose section{display:grid;gap:6px}
+.prose p,.prose ul{margin:0}.prose ul{padding-left:18px;display:grid;gap:5px}
+a{color:var(--accent)}
+.empty{padding:28px 16px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:12px;display:grid;gap:10px;justify-items:center}
+.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:10px;padding:10px 16px;font-weight:600;min-height:44px}
+.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px max(10px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-left,0px));z-index:5}
+.tabs div{display:grid;grid-template-columns:repeat(4,1fr);width:100%;max-width:680px}
+.tab{background:none;border:0;padding:6px 2px;color:var(--muted);display:grid;justify-items:center;gap:3px;font-size:12px;font-weight:500;min-height:50px}
+.tab svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tab[aria-current="page"]{color:var(--accent)}
+.sheet{position:fixed;inset:0;background:var(--bg);overflow-y:auto;z-index:10;padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(32px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.sheet-in{max-width:680px;margin:0 auto;display:grid;gap:18px}
+.sheet-top{display:flex;justify-content:space-between;align-items:center}
+.back{background:none;border:0;padding:8px 0;font-weight:600;min-height:44px}
+.slab{border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden}
+.slab-label{background:var(--accent);color:var(--accent-ink);padding:8px 14px;display:flex;justify-content:space-between;gap:12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;flex-wrap:wrap}
+.slab-body{padding:14px;display:grid;gap:8px}
+.slab-name{font:700 27px/1.08 var(--display);letter-spacing:-.02em;text-wrap:balance}
+.money{font:700 38px/1 var(--display);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.source{display:grid;gap:5px;padding:10px 0;border-bottom:1px solid var(--line)}
+.source-top{display:flex;justify-content:space-between;gap:12px}
+.source-top span:last-child{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
+.source p{margin:0;font-size:12.5px;color:var(--muted)}
+.table-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left}
+th{color:var(--muted);font-weight:500;font-size:12px}
+td:last-child,th:last-child{text-align:right}
+footer{font-size:12px;color:var(--muted);padding-top:4px}
+@media(max-width:430px){h1{font-size:38px}.spark{display:none}.row{grid-template-columns:auto minmax(0,1fr) auto auto;gap:9px}}
+@media(prefers-reduced-motion:no-preference){.sheet{animation:rise .16s ease-out}@keyframes rise{from{transform:translateY(10px)}to{transform:none}}}
+.more{justify-self:center;margin-top:12px}
+.giver{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid var(--line)}
+.giver span:first-child{min-width:0;overflow-wrap:anywhere}
+.giver span:last-child{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+</style>
+</head><body>
+
+<div class="wrap" id="app"></div>
+<nav class="tabs" aria-label="Main"><div id="tabs"></div></nav>
+<div id="sheet-root"></div>
+
+<script>
+let DATA=[],META={},byId={},SNAP="";
+const STATES={AL:"Alabama",AK:"Alaska",AS:"American Samoa",AZ:"Arizona",AR:"Arkansas",CA:"California",CO:"Colorado",CT:"Connecticut",DC:"District of Columbia",DE:"Delaware",FL:"Florida",GA:"Georgia",GU:"Guam",HI:"Hawaii",IA:"Iowa",ID:"Idaho",IL:"Illinois",IN:"Indiana",KS:"Kansas",KY:"Kentucky",LA:"Louisiana",MA:"Massachusetts",MD:"Maryland",ME:"Maine",MI:"Michigan",MN:"Minnesota",MO:"Missouri",MP:"Northern Mariana Islands",MS:"Mississippi",MT:"Montana",NC:"North Carolina",ND:"North Dakota",NE:"Nebraska",NH:"New Hampshire",NJ:"New Jersey",NM:"New Mexico",NV:"Nevada",NY:"New York",OH:"Ohio",OK:"Oklahoma",OR:"Oregon",PA:"Pennsylvania",PR:"Puerto Rico",RI:"Rhode Island",SC:"South Carolina",SD:"South Dakota",TN:"Tennessee",TX:"Texas",UT:"Utah",VA:"Virginia",VI:"Virgin Islands",VT:"Vermont",WA:"Washington",WI:"Wisconsin",WV:"West Virginia",WY:"Wyoming"};
+const stName=c=>STATES[c]||c;
+const PARTY={DEM:["D","Democratic"],REP:["R","Republican"],IND:["I","Independent"],OTH:["O","Other party"]};
+const STATUS={I:"Incumbent",C:"Challenger",O:"Open seat"};
+const RTYPE={Q1:"First quarter",Q2:"Second quarter",Q3:"Third quarter",YE:"Year-end","12P":"Pre-primary","12G":"Pre-general","12R":"Pre-runoff","12S":"Pre-special"};
+const RANGES=[["all","Full cycle","2025-01-01"],["y26","2026","2026-01-01"],["h2","Since July","2026-07-01"]];
+function defaultWatch(){
+  const top=(o,p,n)=>DATA.filter(d=>d.o===o&&d.p===p).sort((a,b)=>b.r-a.r).slice(0,n).map(d=>d.id);
+  return [...top("S","DEM",5),...top("S","REP",5),...top("S","IND",2),...top("H","DEM",3),...top("H","REP",3)];
+}
+const $=(s,r=document)=>r.querySelector(s);
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const usd=n=>{const a=Math.abs(n);if(a>=1e6)return "$"+(n/1e6).toFixed(a>=1e8?0:1)+"M";if(a>=1e3)return "$"+Math.round(n/1e3)+"K";return "$"+Math.round(n)};
+const full=n=>"$"+Math.round(n).toLocaleString("en-US");
+const pct=(a,b)=>b?(a/b*100):0;
+const dfmt=(s,o={month:"short",day:"numeric",year:"numeric"})=>new Date(s+"T12:00:00").toLocaleDateString("en-US",o);
+const seat=d=>d.o==="S"?`${stName(d.st)} Senate`:(d.dist==="00"?`${d.st} At-Large`:`${d.st}-${d.dist}`);
+const STAR='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z" stroke-linejoin="round"/></svg>';
+function load(k,f){try{const v=localStorage.getItem(k);return v?JSON.parse(v):f}catch(e){return f}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+const S={tab:"watch",range:"all",watch:[],limit:100,q:"",chamber:"all",party:"all",state:"all",sort:"r",period:null,open:null,profileRange:"all"};
+
+function series(members){
+  const m=new Map();
+  members.forEach(d=>d.rep.forEach(([t,s,e,a])=>m.set(e,(m.get(e)||0)+a)));
+  let c=0;return [...m.keys()].sort().map(date=>{const amt=m.get(date);c+=amt;return{date,amt,total:c}});
+}
+function windowed(pts,start){
+  const before=pts.filter(p=>p.date<start);
+  const base=before.length?before[before.length-1].total:0;
+  return{base,points:[{date:start,total:base,amt:null},...pts.filter(p=>p.date>=start)]};
+}
+function nice(max){const p=Math.pow(10,Math.floor(Math.log10(max||1)));for(const m of [1,2,2.5,5,10]){if(m*p*4>=max)return m*p}return 10*p}
+function chart(el,pts,start,label){
+  if(!pts.length){el.innerHTML="";return}
+  const {points}=windowed(pts,start);
+  const W=Math.max(el.clientWidth||320,260),H=210,L=46,R=12,T=12,B=24;
+  const t=s=>new Date(s+"T12:00:00").getTime();
+  const x0=t(points[0].date),x1=t(points[points.length-1].date);
+  const max=points[points.length-1].total,step=nice(max),top=step*Math.ceil(max/step)||1;
+  const X=s=>L+(t(s)-x0)/((x1-x0)||1)*(W-L-R),Y=v=>T+(1-v/top)*(H-T-B);
+  let grid="";for(let v=0;v<=top+1;v+=step){grid+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${L-7}" y="${Y(v)+4}" text-anchor="end">${v?usd(v):"$0"}</text>`}
+  const ticks=[];const a=new Date(x0),b=new Date(x1);const span=(x1-x0)/864e5;const mStep=span>400?6:span>200?3:1;
+  for(let y=a.getFullYear(),mo=a.getMonth();new Date(y,mo,1).getTime()<=b.getTime();mo+=mStep){const d=new Date(y,mo,1);if(d.getTime()>=x0-864e5)ticks.push(d)}
+  const xt=ticks.map(d=>{const iso=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-01";const px=X(iso);const anchor=px<L+18?"start":px>W-R-18?"end":"middle";return `<text x="${px}" y="${H-7}" text-anchor="${anchor}">${d.toLocaleDateString("en-US",{month:"short"})} ’${String(d.getFullYear()).slice(2)}</text>`}).join("");
+  const line=points.map((p,i)=>`${i?"L":"M"}${X(p.date).toFixed(1)} ${Y(p.total).toFixed(1)}`).join(" ");
+  const last=points[points.length-1];
+  const gid="g"+Math.random().toString(36).slice(2,8);
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${label}: ${full(points[0].total)} on ${dfmt(points[0].date)}, rising to ${full(last.total)} on ${dfmt(last.date)}">
+    <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".26"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+    ${grid}${xt}
+    <path d="${line} L${X(last.date)} ${Y(0)} L${X(points[0].date)} ${Y(0)} Z" fill="url(#${gid})"/>
+    <path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>
+    <line class="cross" y1="${T}" y2="${Y(0)}" stroke="var(--muted)" stroke-width="1" visibility="hidden"/>
+    <circle class="dot" cx="${X(last.date)}" cy="${Y(last.total)}" r="4.5" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"/>
+  </svg><div class="tip" hidden></div>`;
+  const svg=$("svg",el),tip=$(".tip",el),cross=$(".cross",el),dot=$(".dot",el);
+  const reset=()=>{tip.hidden=true;cross.setAttribute("visibility","hidden");dot.setAttribute("cx",X(last.date));dot.setAttribute("cy",Y(last.total))};
+  svg.addEventListener("pointermove",ev=>{
+    const r=svg.getBoundingClientRect(),mx=(ev.clientX-r.left)/r.width*W;
+    let best=points[0],bd=1e9,idx=0;points.forEach((p,i)=>{const dd=Math.abs(X(p.date)-mx);if(dd<bd){bd=dd;best=p;idx=i}});
+    const px=X(best.date);cross.setAttribute("x1",px);cross.setAttribute("x2",px);cross.setAttribute("visibility","visible");
+    dot.setAttribute("cx",px);dot.setAttribute("cy",Y(best.total));
+    tip.innerHTML=`${dfmt(best.date)}<b>${full(best.total)}</b>${idx&&best.amt!=null?"+"+full(best.amt)+" reported":"Start of range"}`;
+    tip.hidden=false;const tw=tip.offsetWidth;tip.style.left=Math.min(Math.max(0,px/W*r.width-tw/2),r.width-tw)+"px";
+  });
+  svg.addEventListener("pointerleave",reset);
+}
+function spark(d){
+  const pts=series([d]);if(pts.length<2)return "";
+  const max=pts[pts.length-1].total||1,a=new Date(pts[0].date).getTime(),b=new Date(pts[pts.length-1].date).getTime();
+  const p=pts.map((q,i)=>`${i?"L":"M"}${(1+(new Date(q.date).getTime()-a)/(b-a)*62).toFixed(1)} ${(22-q.total/max*20).toFixed(1)}`).join(" ");
+  return `<svg class="spark" viewBox="0 0 64 24" aria-hidden="true"><path d="${p}" fill="none" stroke="var(--accent)" stroke-width="1.6"/></svg>`;
+}
+function tile(d){return `<span class="tile" aria-hidden="true">${d.st}<small>${d.o==="S"?"SEN":"HOUSE"}</small></span>`}
+function chipParty(d){return `<span class="party ${d.p}" title="${partyName(d)}">${PARTY[d.p][0]}</span><span class="vh" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)">${partyName(d)}</span>`}
+function partyName(d){return d.p==="OTH"&&d.pf?d.pf.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()):PARTY[d.p][1]}
+function starBtn(id){const on=S.watch.includes(id);return `<button class="star" data-star="${id}" aria-pressed="${on}" aria-label="${on?"Remove":"Add"} ${esc(byId[id].n)} ${on?"from":"to"} watchlist">${STAR}</button>`}
+function row(d,val,sub){
+  return `<div class="row">${tile(d)}
+    <button class="who" data-open="${d.id}"><strong>${esc(d.n)}</strong><span class="meta">${chipParty(d)}${seat(d)}</span></button>
+    <div style="display:flex;align-items:center;gap:10px">${spark(d)}<span class="amt">${val}<small>${sub}</small></span></div>
+    ${starBtn(d.id)}</div>`;
+}
+function metric(k,d){const b=d.b;return{r:d.r,s:d.s,c:d.c,pac:b.pac,pacp:pct(b.pac,d.r),small:pct(b.iu,d.r),own:b.own}[k]}
+const SORTS={r:["Total raised",d=>usd(d.r),"raised"],s:["Total spent",d=>usd(d.s),"spent"],c:["Cash on hand",d=>usd(d.c),"cash"],pac:["PAC money",d=>usd(d.b.pac),"from PACs"],pacp:["PAC share",d=>pct(d.b.pac,d.r).toFixed(1)+"%","from PACs"],small:["Small-dollar share",d=>pct(d.b.iu,d.r).toFixed(1)+"%","$200 or less"],own:["Candidate's own money",d=>usd(d.b.own),"self-funded"]};
+
+function viewWatch(){
+  const ms=S.watch.map(i=>byId[i]);
+  if(!ms.length)return `<div class="empty"><h2>Your watchlist is empty</h2><p style="margin:0">Star a politician in Explore to see their money here.</p><button class="btn" data-tab="explore">Open Explore</button></div>`;
+  const sum=k=>ms.reduce((a,d)=>a+d[k],0);
+  const withHist=ms.filter(d=>d.rep.length),pts=series(withHist);
+  const start=RANGES.find(r=>r[0]===S.range)[2];
+  const w=pts.length?windowed(pts,start):{base:0,points:[]};
+  const end=pts.length?pts[pts.length-1].total:0;
+  return `<section class="hero"><div class="eyebrow">Watchlist · ${ms.length} ${ms.length===1?"politician":"politicians"}</div>
+    <h1>${usd(sum("r"))}</h1>
+    <div class="sub">raised in the 2025–26 cycle${pts.length&&S.range!=="all"?` · <span class="delta">+${usd(end-w.base)}</span> ${S.range==="y26"?"in 2026":"since July 1"}`:""}</div></section>
+    ${pts.length?`<div class="chips" role="group" aria-label="Chart range">${RANGES.map(r=>`<button class="chip" data-range="${r[0]}" aria-pressed="${S.range===r[0]}">${r[1]}</button>`).join("")}</div>
+    <div class="chart" id="main-chart"></div>
+    <div class="sub">${withHist.length===ms.length?"Cumulative receipts by report end date.":`Chart covers the ${withHist.length} of ${ms.length} politicians with report history.`}</div>`:`<div class="note">No report history is available for these politicians yet, so there's no trend line.</div>`}
+    <div class="stats"><div class="stat"><div class="k">Raised</div><div class="v">${usd(sum("r"))}</div></div><div class="stat"><div class="k">Spent</div><div class="v">${usd(sum("s"))}</div></div><div class="stat"><div class="k">Cash on hand</div><div class="v">${usd(sum("c"))}</div></div></div>
+    <section style="display:grid;gap:4px"><div class="section-head"><h2>Tracked politicians</h2><button class="chip" data-tab="explore">Add more</button></div>
+    <div class="list">${[...ms].sort((a,b)=>b.r-a.r).map(d=>row(d,usd(d.r),"raised")).join("")}</div></section>`;
+}
+function filtered(){
+  const q=S.q.trim().toLowerCase();
+  return DATA.filter(d=>(S.chamber==="all"||d.o===S.chamber)&&(S.party==="all"||d.p===S.party)&&(S.state==="all"||d.st===S.state)&&(!q||(d.n+" "+d.f+" "+stName(d.st)+" "+d.st).toLowerCase().includes(q))).sort((a,b)=>metric(S.sort,b)-metric(S.sort,a));
+}
+function viewExplore(){
+  const opt=(arr,cur)=>arr.map(([v,t])=>`<option value="${v}" ${cur===v?"selected":""}>${t}</option>`).join("");
+  const sts=[...new Set(DATA.map(d=>d.st))].sort((a,b)=>stName(a).localeCompare(stName(b)));
+  return `<section class="hero"><div class="eyebrow">Explore</div><h2 style="font-size:26px">Follow the filings</h2></section>
+  <div class="tools"><input class="field" id="q" type="search" placeholder="Search by name or state" aria-label="Search by name or state" value="${S.q.replace(/"/g,"&quot;")}">
+    <div class="chips" role="group" aria-label="Chamber">${[["all","All"],["S","Senate"],["H","House"]].map(([v,t])=>`<button class="chip" data-chamber="${v}" aria-pressed="${S.chamber===v}">${t}</button>`).join("")}</div>
+    <div class="selects"><label for="party">Party<select class="field" id="party">${opt([["all","All parties"],["DEM","Democratic"],["REP","Republican"],["IND","Independent"],["OTH","Other parties"]],S.party)}</select></label>
+    <label for="state">State<select class="field" id="state">${opt([["all","All states"],...sts.map(s=>[s,stName(s)])],S.state)}</select></label>
+    <label for="sort" style="grid-column:1/-1">Sort by<select class="field" id="sort">${opt(Object.entries(SORTS).map(([k,v])=>[k,v[0]]),S.sort)}</select></label></div></div>
+  <div id="results"></div>`;
+}
+function resultsHTML(){
+  const rows=filtered(),s=SORTS[S.sort];
+  return `<div class="sub" style="padding-bottom:4px">${rows.length} of ${DATA.length} shown</div>${rows.length?`<div class="list">${rows.slice(0,S.limit).map(d=>row(d,s[1](d),s[2])).join("")}</div>${rows.length>S.limit?`<div style="display:grid"><button class="chip more" data-more>Show 100 more</button></div>`:""}`:`<div class="empty">No politicians match. Clear the search or widen a filter.</div>`}`;
+}
+function quarters(){
+  const seen=new Set();DATA.forEach(d=>d.rep.forEach(r=>{const[y,m]=r[2].split("-").map(Number);seen.add(y+"-Q"+Math.ceil(m/3))}));
+  return [...seen].sort().reverse().slice(0,4);
+}
+function qRange(q){const[y,n]=q.split("-Q").map(Number);const a=String(n*3-2).padStart(2,"0"),b=String(n*3).padStart(2,"0");return[`${y}-${a}-01`,`${y}-${b}-31`]}
+function viewMovers(){
+  const qs=quarters();if(!qs.length)return `<div class="empty">No report history is loaded yet.</div>`;
+  if(!qs.includes(S.period))S.period=qs[0];
+  const [from,to]=qRange(S.period);
+  const rows=DATA.map(d=>({d,amt:d.rep.filter(r=>r[2]>=from&&r[2]<=to).reduce((a,r)=>a+r[3],0)})).filter(x=>x.amt>0).sort((a,b)=>b.amt-a.amt);
+  const shown=rows.slice(0,50),max=shown[0]?.amt||1;
+  return `<section class="hero"><div class="eyebrow">Movers</div><h2 style="font-size:26px">Most raised in a quarter</h2><div class="sub">Top ${shown.length} of ${rows.length} candidates with reports ending in this quarter. A quarter can be incomplete while filings are still coming in.</div></section>
+  <div class="chips" role="group" aria-label="Quarter">${qs.map(q=>`<button class="chip" data-period="${q}" aria-pressed="${S.period===q}">${q.split("-")[1]} ${q.split("-")[0]}</button>`).join("")}</div>
+  <div>${shown.map((x,i)=>`<button class="mover" data-open="${x.d.id}"><span class="rank">${i+1}</span><span class="meta" style="font-size:15px;color:var(--ink);font-weight:600">${x.d.n} ${chipParty(x.d)}</span><span class="amt">${usd(x.amt)}</span><span class="bar"><i style="width:${(x.amt/max*100).toFixed(1)}%"></i></span></button>`).join("")}</div>`;
+}
+function viewData(){
+  const hist=DATA.filter(d=>d.rep.length).length;
+  const who=META.sample?`<p>This is a starter sample of ${DATA.length} candidates. Its party counts were set by hand, so adding up totals by party here wouldn't describe the real field. The first daily update replaces it with every candidate who meets the site's minimum.</p>`:`<p>${DATA.length.toLocaleString("en-US")} House and Senate candidates who raised at least ${full(META.minReceipts||0)} this cycle. This can include people who lost a primary or stopped running. Presidential and state races aren't included.</p>`;
+  return `<div class="prose"><section><div class="eyebrow">About the data</div><h2 style="font-size:26px">What these numbers cover</h2>
+  <p>Every figure comes from Federal Election Commission filings through the OpenFEC service, last updated ${SNAP}. Each profile shows when its filings end, so recent money may not be included yet.</p></section>
+  <section><h2>Counted</h2><ul><li>Receipts reported by candidates' campaign committees for the ${META.cycle-1}–${String(META.cycle).slice(2)} cycle.</li><li>Individual, PAC, party, candidate-funded and transfer money, as the campaign reported it.</li></ul></section>
+  <section><h2>Not counted</h2><ul><li>Super PACs and other outside groups spending independently.</li><li>Leadership PACs and party spending made separately from the campaign.</li><li>State and local races, and gifts or income outside campaign finance law.</li></ul></section>
+  <section><h2>How to read it</h2><ul><li>Raised money isn't all donations. Totals can include loans, refunds and transfers.</li><li>A contribution shows money was received. It doesn't show a favor, a vote or wrongdoing.</li><li>Transfers often come from joint fundraising committees, which can pass along individual donations.</li><li>A small gap can exist between a candidate's total and the source breakdown, which covers the principal campaign committee. It's shown as other receipts.</li></ul></section>
+  <section><h2>Who's included</h2>${who}</section>
+  <section><h2>Individual donors</h2><p>This site shows committees and totals. It doesn't list individual donors. Federal law limits using contributor information from FEC filings to solicit contributions or for commercial purposes.</p></section>
+  <section><h2>Report history</h2><p>Trend lines are available for ${hist.toLocaleString("en-US")} of ${DATA.length.toLocaleString("en-US")} candidates.</p></section>
+  <footer>Independent public-interest project, not affiliated with the FEC. Check any figure against the filing linked on each profile.</footer></div>`;
+}
+const TABS=[["watch","Watchlist",'<path d="M4 18l5-6 4 3 7-9"/><path d="M4 21h16"/>'],["explore","Explore",'<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>'],["movers","Movers",'<path d="M5 20V12M12 20V5M19 20v-5"/>'],["data","About data",'<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.2"/>']];
+function render(){
+  $("#tabs").innerHTML=TABS.map(([k,t,i])=>`<button class="tab" data-tab="${k}" ${S.tab===k?'aria-current="page"':""}><svg viewBox="0 0 24 24" aria-hidden="true">${i}</svg>${t}</button>`).join("");
+  const head=`<header class="top"><div class="brand">Filed<span>.</span></div><div class="stamp">FEC filings<br>updated ${SNAP}</div></header>`;
+  $("#app").innerHTML=head+({watch:viewWatch,explore:viewExplore,movers:viewMovers,data:viewData}[S.tab])();
+  if(S.tab==="explore")$("#results").innerHTML=resultsHTML();
+  drawMain();
+}
+function drawMain(){const el=$("#main-chart");if(el){const ms=S.watch.map(i=>byId[i]).filter(d=>d.rep.length);chart(el,series(ms),RANGES.find(r=>r[0]===S.range)[2],"Cumulative money raised by watchlist")}}
+function renderSheet(){
+  const root=$("#sheet-root");
+  if(!S.open){root.innerHTML="";document.documentElement.style.overflow="";return}
+  const d=byId[S.open],b=d.b;document.documentElement.style.overflow="hidden";
+  const other=Math.max(0,d.r-b.ii-b.iu-b.pac-b.pty-b.own-b.tr);
+  const src=[["Individuals, itemized",b.ii,"Donors who gave more than $200 in total, reported by name to the FEC."],["Individuals, unitemized",b.iu,"Donors who gave $200 or less in total."],["PACs and other committees",b.pac,"Contributions from political action committees."],["Party committees",b.pty,"Direct contributions from party committees."],["Candidate's own money and loans",b.own,"The candidate's own contributions and loans to the campaign."],["Transfers from other committees",b.tr,"Often joint fundraising committees, which can pass along individual donations."],["Other receipts",other,"Other loans, refunds, interest and receipts outside this breakdown."]];
+  const hist=d.rep.length>0;
+  root.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(d.n)} profile" tabindex="-1"><div class="sheet-in">
+    <div class="sheet-top"><button class="back" data-close>‹ Back</button>${starBtn(d.id)}</div>
+    <article class="slab"><div class="slab-label"><span>2026 CYCLE · ${d.o==="S"?"U.S. SENATE":"U.S. HOUSE"}</span><span>FEC ${d.id}</span></div>
+      <div class="slab-body"><div class="slab-name">${d.n}</div><div class="meta">${chipParty(d)}${partyName(d)} · ${seat(d)}${STATUS[d.ic]?" · "+STATUS[d.ic]:""}</div>
+      <div style="padding-top:8px"><div class="money">${full(d.r)}</div><div class="sub">raised, ${d.thru?`as filed through ${dfmt(d.thru)}`:"as filed"}</div></div></div></article>
+    <div class="stats"><div class="stat"><div class="k">Spent</div><div class="v">${usd(d.s)}</div></div><div class="stat"><div class="k">Cash on hand</div><div class="v">${usd(d.c)}</div></div><div class="stat"><div class="k">From PACs</div><div class="v">${pct(b.pac,d.r).toFixed(1)}%</div></div></div>
+    ${hist?`<section style="display:grid;gap:10px"><h2>Money raised over time</h2><div class="chart" id="profile-chart"></div></section>`:`<div class="note">No report-by-report history is available for this profile yet.</div>`}
+    <section><h2>Where the money came from</h2>${src.map(([k,v,t])=>`<div class="source"><div class="source-top"><span>${k}</span><span>${usd(v)} · ${pct(v,d.r).toFixed(1)}%</span></div><div class="bar"><i style="width:${Math.min(100,pct(v,d.r)).toFixed(1)}%"></i></div><p>${t}</p></div>`).join("")}</section>
+    ${(d.top||[]).length?`<section style="display:grid;gap:4px"><h2>Largest committee contributors</h2><div class="sub">From the 100 largest committee contributions. Includes PACs, party groups and joint fundraising committees. Individual donors aren't shown.</div>${d.top.map(([n,a])=>`<div class="giver"><span>${esc(n)}</span><span>${full(a)}</span></div>`).join("")}</section>`:""}
+    ${hist?`<section style="display:grid;gap:6px"><h2>Filed reports</h2><div class="table-wrap"><table><thead><tr><th>Period</th><th>Report</th><th>Raised</th></tr></thead><tbody>${[...d.rep].sort((a,c)=>c[2].localeCompare(a[2])).map(r=>`<tr><td>${dfmt(r[1],{month:"short",day:"numeric"})} – ${dfmt(r[2])}</td><td>${RTYPE[r[0]]||r[0]}</td><td>${full(r[3])}</td></tr>`).join("")}</tbody></table></div></section>`:""}
+    <div class="note">Campaign committee money only. Outside spending isn't included. Filed by the campaign as <b>${esc(d.f)}</b>, principal committee ${d.cm}. <a href="https://www.fec.gov/data/candidate/${d.id}/?cycle=2026" target="_blank" rel="noopener">Open this candidate at the FEC</a></div>
+  </div></div>`;
+  const sh=$(".sheet",root);sh.focus();
+  const pc=$("#profile-chart");if(pc)chart(pc,series([d]),profileStart(d),`Cumulative money raised by ${d.n}`);
+}
+function profileStart(d){const first=d.rep.map(r=>r[1]).sort()[0];return first>"2025-01-01"?first:"2025-01-01"}
+document.addEventListener("click",e=>{
+  const t=e.target.closest("button");if(!t)return;const v=t.dataset;
+  if(v.star){const i=S.watch.indexOf(v.star);i>=0?S.watch.splice(i,1):S.watch.push(v.star);save("filed.watch",S.watch);render();if(S.open)renderSheet();return}
+  if(v.open){S.lastFocus=v.open;S.open=v.open;renderSheet();return}
+  if("close" in v){S.open=null;renderSheet();const b=document.querySelector(`[data-open="${S.lastFocus}"]`);b&&b.focus();return}
+  if("more" in v){S.limit+=100;$("#results").innerHTML=resultsHTML();return}
+  if(v.tab){S.tab=v.tab;render();scrollTo(0,0);return}
+  if(v.range){S.range=v.range;render();return}
+  if(v.chamber){S.chamber=v.chamber;render();return}
+  if(v.period){S.period=v.period;render();return}
+});
+document.addEventListener("input",e=>{if(e.target.id==="q"){S.q=e.target.value;S.limit=100;$("#results").innerHTML=resultsHTML()}});
+document.addEventListener("change",e=>{const id=e.target.id;if(["party","state","sort"].includes(id)){S[id]=e.target.value;S.limit=100;$("#results").innerHTML=resultsHTML()}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.open){S.open=null;renderSheet()}});
+let rt;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{drawMain();if(S.open){const d=byId[S.open],pc=$("#profile-chart");if(pc)chart(pc,series([d]),profileStart(d),`Cumulative money raised by ${d.n}`)}},120)});
+async function boot(){
+  $("#app").innerHTML='<div class="empty" style="margin-top:40px">Loading FEC filings…</div>';
+  try{
+    const res=await fetch("data/candidates.json",{cache:"no-cache"});
+    if(!res.ok)throw new Error(res.status);
+    const j=await res.json();
+    DATA=j.candidates;META=j.meta;byId=Object.fromEntries(DATA.map(d=>[d.id,d]));
+    SNAP=dfmt(META.generated);
+    S.watch=load("filed.watch",defaultWatch()).filter(i=>byId[i]);
+    render();
+  }catch(e){$("#app").innerHTML='<div class="empty" style="margin-top:40px"><h2>The data didn\'t load</h2><p style="margin:0">Refresh the page to try again.</p></div>'}
+}
+boot();
+</script>
+</body></html>
