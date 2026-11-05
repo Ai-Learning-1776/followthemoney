@@ -14,10 +14,12 @@ CYCLE = int(os.environ.get("FEC_CYCLE", "2026"))
 MIN_RECEIPTS = float(os.environ.get("MIN_RECEIPTS", "5000"))
 TOP_COMMITTEE_LOOKUPS = int(os.environ.get("TOP_COMMITTEE_LOOKUPS", "400"))
 MIN_EXPECTED = int(os.environ.get("MIN_EXPECTED", "300"))
+REPORT_BATCH = int(os.environ.get("REPORT_BATCH", "7"))
 PAUSE = float(os.environ.get("REQUEST_PAUSE", "3.7"))  # stays under 1,000 requests an hour
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "data" / "candidates.json"
 OVERRIDES = json.loads((ROOT / "scripts" / "name_overrides.json").read_text())
+COMMITTEE_TYPES = {"PAC", "PTY", "COM", "CCM"}
 INDEPENDENT = {"IND", "NPA", "NNE", "NOP"}
 SUFFIXES = {"JR", "SR", "II", "III", "IV", "MR", "MRS", "MS", "DR", "SEN", "REP", "HON", "ESQ", "PHD", "MD"}
 requests_made = 0
@@ -76,7 +78,7 @@ def pretty_name(filed):
     if "," not in filed:
         return filed.title()
     last, rest = filed.split(",", 1)
-    words = [w for w in rest.replace(".", " ").split() if w.upper() not in SUFFIXES]
+    words = [w for w in rest.replace(".", " ").replace(",", " ").split() if w.upper() not in SUFFIXES]
     fix = lambda w: "-".join(p.capitalize() for p in w.split("-"))
     def case(w):
         w = fix(w)
@@ -125,26 +127,56 @@ def fetch_totals(committee_ids):
     return totals
 
 
+def fetch_report_batch(batch, seen):
+    """Fetch reports for a batch that fits on one page.
+
+    Rows tied on the sort date can repeat or vanish between pages, so a batch
+    that spills onto a second page is split rather than paged through.
+    """
+    data = get("/reports/house-senate/", {"cycle": CYCLE, "is_amended": "false", "committee_id": batch,
+                                          "sort": "-coverage_end_date", "per_page": 100, "page": 1})
+    if data.get("pagination", {}).get("pages", 1) > 1 and len(batch) > 1:
+        middle = len(batch) // 2
+        fetch_report_batch(batch[:middle], seen)
+        fetch_report_batch(batch[middle:], seen)
+        return
+    for r in data.get("results", []):
+        end, start = (r.get("coverage_end_date") or "")[:10], (r.get("coverage_start_date") or "")[:10]
+        if end:
+            seen[(r["committee_id"], r.get("report_type") or "", start, end)] = round(num(r.get("total_receipts_period")))
+
+
 def fetch_reports(committee_ids):
+    seen = {}
+    for batch in chunks(committee_ids, REPORT_BATCH):
+        fetch_report_batch(batch, seen)
     reports = {}
-    for batch in chunks(committee_ids, 40):
-        for r in pages("/reports/house-senate/", {"cycle": CYCLE, "is_amended": "false", "committee_id": batch,
-                                                 "sort": "-coverage_end_date"}):
-            end, start = (r.get("coverage_end_date") or "")[:10], (r.get("coverage_start_date") or "")[:10]
-            if end:
-                reports.setdefault(r["committee_id"], []).append(
-                    [r.get("report_type") or "", start, end, round(num(r.get("total_receipts_period")))])
+    for (cm, kind, start, end), amount in seen.items():
+        reports.setdefault(cm, []).append([kind, start, end, amount])
     return reports
 
 
+def history_matches(total, history):
+    """True when filed reports add up to about the candidate's total."""
+    gap = abs(sum(r[3] for r in history) - total)
+    return gap <= max(50000, 0.10 * total)
+
+
 def fetch_top_committees(committee_id):
-    """Largest committee contributions. Individuals and candidates are excluded."""
+    """Largest contributions from political committees only.
+
+    Individuals, candidates, and non-committee receipts such as bank interest
+    and vendor refunds are excluded.
+    """
     data = get("/schedules/schedule_a/", {"committee_id": committee_id, "two_year_transaction_period": CYCLE,
                                           "is_individual": "false", "sort": "-contribution_receipt_amount",
                                           "per_page": 100})
     totals = {}
     for row in data.get("results", []):
-        if row.get("memo_code") == "X" or row.get("entity_type") in ("IND", "CAN"):
+        if row.get("memo_code") == "X" or row.get("entity_type") not in COMMITTEE_TYPES:
+            continue
+        line = str(row.get("line_number") or "")
+        if line and not line.startswith(("11", "12")):
             continue
         name = " ".join((row.get("contributor_name") or "").split())
         amount = num(row.get("contribution_receipt_amount"))
@@ -183,6 +215,7 @@ def main():
     print(f"Contributor lists loaded: {len(top)}; skipped: {failures}", flush=True)
 
     out = []
+    dropped_histories = 0
     for r in kept:
         cid = r["candidate_id"]
         cm = committees[cid]
@@ -190,6 +223,10 @@ def main():
         party = r.get("party") or ""
         party = party if party in ("DEM", "REP") else "IND" if party in INDEPENDENT else "OTH"
         filed = " ".join((r.get("name") or "").split())
+        history = reports.get(cm, [])
+        if history and not history_matches(num(r.get("receipts")), history):
+            dropped_histories += 1
+            history = []
         out.append({
             "id": cid, "f": filed, "n": OVERRIDES.get(cid) or pretty_name(filed), "p": party, "pf": r.get("party_full") or "",
             "o": r.get("office"), "st": r.get("state") or "", "dist": r.get("district") or "00",
@@ -202,11 +239,14 @@ def main():
                   "pty": round(num(t.get("political_party_committee_contributions"))),
                   "own": round(num(t.get("candidate_contribution")) + num(t.get("loans_made_by_candidate"))),
                   "tr": round(num(t.get("transfers_from_other_authorized_committee")))},
-            "rep": reports.get(cm, []), "top": top.get(cm, []),
+            "rep": history, "top": top.get(cm, []),
         })
 
+    print(f"Histories hidden because they don't match totals: {dropped_histories}", flush=True)
     if len(out) < MIN_EXPECTED or len(totals) < 0.9 * len(out):
         sys.exit(f"Run looks incomplete ({len(out)} candidates, {len(totals)} totals). Keeping the last good data.")
+    if dropped_histories > 0.15 * max(1, len(reports)):
+        sys.exit(f"Too many report histories don't match totals ({dropped_histories}). Keeping the last good data.")
     meta = {"generated": datetime.date.today().isoformat(), "cycle": CYCLE, "count": len(out), "sample": False,
             "source": "OpenFEC", "minReceipts": MIN_RECEIPTS, "requests": requests_made}
     tmp = OUT.with_suffix(".tmp")
