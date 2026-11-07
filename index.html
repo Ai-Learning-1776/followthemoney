@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="Track what federal candidates raise and spend, using public FEC filings.">
+<meta name="description" content="Track what federal candidates raise and spend, and who pays to lobby Congress, using public FEC and lobbying filings.">
 <title>Filed Money Tracker</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&display=swap">
 <style>
@@ -78,7 +78,7 @@ a{color:var(--accent)}
 .empty{padding:28px 16px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:12px;display:grid;gap:10px;justify-items:center}
 .btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:10px;padding:10px 16px;font-weight:600;min-height:44px}
 .tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px max(10px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-left,0px));z-index:5}
-.tabs div{display:grid;grid-template-columns:repeat(4,1fr);width:100%;max-width:680px}
+.tabs div{display:grid;grid-template-columns:repeat(5,1fr);width:100%;max-width:680px}
 .tab{background:none;border:0;padding:6px 2px;color:var(--muted);display:grid;justify-items:center;gap:3px;font-size:12px;font-weight:500;min-height:50px}
 .tab svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .tab[aria-current="page"]{color:var(--accent)}
@@ -107,6 +107,16 @@ footer{font-size:12px;color:var(--muted);padding-top:4px}
 .giver{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid var(--line)}
 .giver span:first-child{min-width:0;overflow-wrap:anywhere}
 .giver span:last-child{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.lrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 12px;padding:11px 0;border:0;border-bottom:1px solid var(--line);background:none;width:100%;text-align:left;align-items:center}
+.lrow strong{font-weight:600;overflow-wrap:anywhere}
+.lrow .meta{grid-column:1}
+.lrow .amt{grid-row:1/3;grid-column:2}
+.pos{font-size:12.5px;color:var(--muted);grid-column:1/-1;overflow-wrap:anywhere}
+.tag{display:inline-block;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:11px;font-weight:600;color:var(--muted)}
+.qbars{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;align-items:end;height:120px;padding-top:8px}
+.qbar{display:grid;gap:4px;align-content:end;height:100%;text-align:center;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.qbar i{display:block;background:var(--accent);border-radius:4px 4px 0 0;min-height:2px}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent);font-weight:600;text-align:left;overflow-wrap:anywhere}
 </style>
 </head><body>
 
@@ -136,7 +146,7 @@ const seat=d=>d.o==="S"?`${stName(d.st)} Senate`:(d.dist==="00"?`${d.st} At-Larg
 const STAR='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z" stroke-linejoin="round"/></svg>';
 function load(k,f){try{const v=localStorage.getItem(k);return v?JSON.parse(v):f}catch(e){return f}}
 function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
-const S={tab:"watch",range:"all",watch:[],limit:100,q:"",chamber:"all",party:"all",state:"all",sort:"r",period:null,open:null,profileRange:"all"};
+const S={lob:null,lmode:"firms",lq:"",llimit:100,lgov:false,tab:"watch",range:"all",watch:[],limit:100,q:"",chamber:"all",party:"all",state:"all",sort:"r",period:null,open:null,profileRange:"all"};
 
 function series(members){
   const m=new Map();
@@ -266,19 +276,23 @@ function viewData(){
   <section><h2>Who's included</h2>${who}</section>
   <section><h2>Individual donors</h2><p>This site shows committees and totals. It doesn't list individual donors. Federal law limits using contributor information from FEC filings to solicit contributions or for commercial purposes.</p></section>
   <section><h2>Report history</h2><p>Trend lines are available for ${hist.toLocaleString("en-US")} of ${DATA.length.toLocaleString("en-US")} candidates.</p></section>
-  <footer>Independent public-interest project, not affiliated with the FEC. Check any figure against the filing linked on each profile.</footer></div>`;
+  <section><h2>Lobbying</h2><p>The Lobbying tab uses quarterly reports filed under the Lobbying Disclosure Act, published by the Clerk of the House and the Secretary of the Senate at lda.gov. Firms report what each client paid them, and organizations that lobby for themselves report what they spent. By law these amounts are rounded to the nearest $10,000, and amounts under $5,000 aren't given. Lobbyists are listed by name as they appear on the reports, along with any former government jobs they disclosed. Lobbying is legal, and a listing doesn't suggest wrongdoing.</p></section>
+  <footer>Independent public-interest project, not affiliated with the FEC, Congress or lda.gov. Check any figure against the filing linked on each profile.</footer></div>`;
 }
-const TABS=[["watch","Watchlist",'<path d="M4 18l5-6 4 3 7-9"/><path d="M4 21h16"/>'],["explore","Explore",'<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>'],["movers","Movers",'<path d="M5 20V12M12 20V5M19 20v-5"/>'],["data","About data",'<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.2"/>']];
+const TABS=[["watch","Watchlist",'<path d="M4 18l5-6 4 3 7-9"/><path d="M4 21h16"/>'],["explore","Explore",'<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>'],["movers","Movers",'<path d="M5 20V12M12 20V5M19 20v-5"/>'],["lobby","Lobbying",'<path d="M3 9.5L12 4l9 5.5"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8"/><path d="M3 20.5h18"/>'],["data","About",'<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.2"/>']];
 function render(){
   $("#tabs").innerHTML=TABS.map(([k,t,i])=>`<button class="tab" data-tab="${k}" ${S.tab===k?'aria-current="page"':""}><svg viewBox="0 0 24 24" aria-hidden="true">${i}</svg>${t}</button>`).join("");
-  const head=`<header class="top"><div class="brand">Filed<span>.</span></div><div class="stamp">FEC filings<br>updated ${SNAP}</div></header>`;
-  $("#app").innerHTML=head+({watch:viewWatch,explore:viewExplore,movers:viewMovers,data:viewData}[S.tab])();
+  const lob=S.tab==="lobby"&&L;
+  const head=`<header class="top"><div class="brand">Filed<span>.</span></div><div class="stamp">${lob?"Lobbying filings":"FEC filings"}<br>updated ${lob?dfmt(L.meta.generated):SNAP}</div></header>`;
+  $("#app").innerHTML=head+({watch:viewWatch,explore:viewExplore,movers:viewMovers,lobby:viewLobby,data:viewData}[S.tab])();
   if(S.tab==="explore")$("#results").innerHTML=resultsHTML();
+  if(S.tab==="lobby"&&L)$("#lresults").innerHTML=lobResultsHTML();
   drawMain();
 }
 function drawMain(){const el=$("#main-chart");if(el){const ms=S.watch.map(i=>byId[i]).filter(d=>d.rep.length);chart(el,series(ms),RANGES.find(r=>r[0]===S.range)[2],"Cumulative money raised by watchlist")}}
 function renderSheet(){
   const root=$("#sheet-root");
+  if(S.lob){renderLobSheet(root);return}
   if(!S.open){root.innerHTML="";document.documentElement.style.overflow="";return}
   const d=byId[S.open],b=d.b;document.documentElement.style.overflow="hidden";
   const other=Math.max(0,d.r-b.ii-b.iu-b.pac-b.pty-b.own-b.tr);
@@ -303,18 +317,138 @@ function profileStart(d){const first=d.rep.map(r=>r[1]).sort()[0];return first>"
 document.addEventListener("click",e=>{
   const t=e.target.closest("button");if(!t)return;const v=t.dataset;
   if(v.star){const i=S.watch.indexOf(v.star);i>=0?S.watch.splice(i,1):S.watch.push(v.star);save("filed.watch",S.watch);render();if(S.open)renderSheet();return}
-  if(v.open){S.lastFocus=v.open;S.open=v.open;renderSheet();return}
-  if("close" in v){S.open=null;renderSheet();const b=document.querySelector(`[data-open="${S.lastFocus}"]`);b&&b.focus();return}
+  if(v.open){S.lastFocus=`[data-open="${v.open}"]`;S.lob=null;S.open=v.open;renderSheet();return}
+  if(v.lob){if(!S.lob)S.lastFocus=`[data-lob="${v.lob}"]`;S.open=null;S.lob=v.lob;renderSheet();return}
+  if("close" in v){S.open=null;S.lob=null;renderSheet();const b=S.lastFocus&&document.querySelector(S.lastFocus);b&&b.focus();return}
+  if(v.lmode){S.lmode=v.lmode;S.llimit=100;render();return}
+  if("lmore" in v){S.llimit+=100;$("#lresults").innerHTML=lobResultsHTML();return}
+  if("lgov" in v){S.lgov=!S.lgov;S.llimit=100;render();return}
+  if("lretry" in v){loadLobby();return}
   if("more" in v){S.limit+=100;$("#results").innerHTML=resultsHTML();return}
-  if(v.tab){S.tab=v.tab;render();scrollTo(0,0);return}
+  if(v.tab){S.tab=v.tab;if(v.tab==="lobby"&&!L)loadLobby();render();scrollTo(0,0);return}
   if(v.range){S.range=v.range;render();return}
   if(v.chamber){S.chamber=v.chamber;render();return}
   if(v.period){S.period=v.period;render();return}
 });
-document.addEventListener("input",e=>{if(e.target.id==="q"){S.q=e.target.value;S.limit=100;$("#results").innerHTML=resultsHTML()}});
+document.addEventListener("input",e=>{if(e.target.id==="q"){S.q=e.target.value;S.limit=100;$("#results").innerHTML=resultsHTML()}if(e.target.id==="lq"){S.lq=e.target.value;S.llimit=100;$("#lresults").innerHTML=lobResultsHTML()}});
 document.addEventListener("change",e=>{const id=e.target.id;if(["party","state","sort"].includes(id)){S[id]=e.target.value;S.limit=100;$("#results").innerHTML=resultsHTML()}});
-document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.open){S.open=null;renderSheet()}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&(S.open||S.lob)){S.open=null;S.lob=null;renderSheet()}});
 let rt;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{drawMain();if(S.open){const d=byId[S.open],pc=$("#profile-chart");if(pc)chart(pc,series([d]),profileStart(d),`Cumulative money raised by ${d.n}`)}},120)});
+/* Lobbying: loaded on first visit to the tab. Firms, clients and lobbyists all come from lda.gov LD-2 reports. */
+let L=null,LERR=false;
+const qName=q=>{const[y,n]=q.split("-Q");return `Q${n} ’${y.slice(2)}`};
+const lusd=n=>n>0?usd(n):"Under $5K";
+async function loadLobby(){
+  LERR=false;if(S.tab==="lobby")render();
+  try{
+    const res=await fetch("data/lobbying.json",{cache:"no-cache"});
+    if(res.status===404){LERR="pending";if(S.tab==="lobby")render();return}
+    if(!res.ok)throw new Error(res.status);
+    const j=await res.json();
+    const firms=j.firms.map((f,i)=>({...f,ix:i,key:(f.n+" "+f.d).toLowerCase()}));
+    // Group what each client paid, across every firm that reported them.
+    const clients=j.clients.map(([n,d,st],i)=>({ix:i,n,d,st,firms:[],paid:0,own:0,key:n.toLowerCase()}));
+    const lobs=j.lobbyists.map(([n,pos],i)=>({ix:i,n,pos,firms:[],key:(n+" "+pos).toLowerCase(),last:n.split(" ").filter(w=>!/^(jr|sr|ii|iii|iv)\.?$/i.test(w)).pop()||n}));
+    firms.forEach(f=>{
+      f.c.forEach(([c,amt,sub,own])=>{const cl=clients[c];cl.firms.push([f.ix,amt,sub,own]);if(own)cl.own+=amt;else if(!sub)cl.paid+=amt});
+      f.l.forEach(l=>lobs[l].firms.push(f.ix));
+    });
+    clients.forEach(c=>{c.firms.sort((a,b)=>b[1]-a[1]);c.t=c.own+c.paid});
+    lobs.sort((a,b)=>a.last.localeCompare(b.last)||a.n.localeCompare(b.n));
+    L={meta:j.meta,firms,clients,lobs,clientById:clients,lobById:Object.fromEntries(lobs.map(l=>[l.ix,l]))};
+  }catch(e){LERR=true}
+  if(S.tab==="lobby")render();
+}
+function lobRows(){
+  const q=S.lq.trim().toLowerCase(),m=S.lmode;
+  if(m==="firms"||m==="house")return L.firms.filter(f=>(m==="house")===!!f.h&&(!q||f.key.includes(q)));
+  if(m==="clients")return L.clients.filter(c=>c.firms.length&&(!q||c.key.includes(q))).sort((a,b)=>b.t-a.t);
+  return L.lobs.filter(l=>(!S.lgov||l.pos)&&(!q||l.key.includes(q)));
+}
+function firmRow(f){
+  return `<button class="lrow" data-lob="f${f.ix}"><strong>${esc(f.n)}</strong><span class="amt">${lusd(f.t)}<small>${f.h?"spent":"income"}</small></span>
+    <span class="meta">${f.st?esc(f.st)+" · ":""}${f.h?"Lobbies for itself":`${f.c.length} ${f.c.length===1?"client":"clients"}`} · ${f.l.length} ${f.l.length===1?"lobbyist":"lobbyists"}</span></button>`;
+}
+function clientRow(c){
+  return `<button class="lrow" data-lob="c${c.ix}"><strong>${esc(c.n)}</strong><span class="amt">${lusd(c.t)}<small>reported</small></span>
+    <span class="meta">${c.d?esc(c.d.length>70?c.d.slice(0,68)+"…":c.d)+" · ":""}${c.firms.filter(x=>!x[3]).length} ${c.firms.filter(x=>!x[3]).length===1?"firm":"firms"} hired${c.own?" · lobbies in-house":""}</span></button>`;
+}
+function lobbyistRow(l){
+  const firm=L.firms[l.firms[0]];
+  return `<button class="lrow" data-lob="p${l.ix}"><strong>${esc(l.n)}</strong><span></span>
+    <span class="meta">${firm?esc(firm.n):""}${l.firms.length>1?` +${l.firms.length-1} more`:""}</span>${l.pos?`<span class="pos">Former: ${esc(l.pos.length>110?l.pos.slice(0,108)+"…":l.pos)}</span>`:""}</button>`;
+}
+function viewLobby(){
+  const intro=`<section class="hero"><div class="eyebrow">Lobbying</div><h2 style="font-size:26px">Who pays to lobby Congress</h2></section>`;
+  if(LERR==="pending")return intro+`<div class="empty"><h2>Lobbying data is on its way</h2><p style="margin:0">The first download of every lobbying report is still running. Check back in a few hours.</p></div>`;
+  if(LERR)return intro+`<div class="empty"><h2>The lobbying data didn't load</h2><p style="margin:0">Check your connection and try again.</p><button class="btn" data-lretry>Try again</button></div>`;
+  if(!L)return intro+`<div class="empty">Loading lobbying filings…</div>`;
+  const outside=L.firms.filter(f=>!f.h),house=L.firms.filter(f=>f.h);
+  const qs=L.meta.quarters,span=`${qName(qs[0])} – ${qName(qs[qs.length-1])}`;
+  const MODES=[["firms","Firms"],["house","In-house"],["clients","Clients"],["people","Lobbyists"]];
+  const ph={firms:"Search lobbying firms",house:"Search organizations",clients:"Search clients, like a company or group",people:"Search lobbyists or former jobs"}[S.lmode];
+  return `${intro}
+  <div class="stats"><div class="stat"><div class="k">Paid to firms</div><div class="v">${usd(outside.reduce((a,f)=>a+f.t,0))}</div></div><div class="stat"><div class="k">Spent in-house</div><div class="v">${usd(house.reduce((a,f)=>a+f.t,0))}</div></div><div class="stat"><div class="k">Lobbyists</div><div class="v">${L.lobs.length.toLocaleString("en-US")}</div></div></div>
+  <div class="sub">Reported for ${span}. Amounts are rounded to the nearest $10,000 by law.</div>
+  <div class="tools"><div class="chips" role="group" aria-label="Show">${MODES.map(([k,t])=>`<button class="chip" data-lmode="${k}" aria-pressed="${S.lmode===k}">${t}</button>`).join("")}</div>
+    <input class="field" id="lq" type="search" placeholder="${ph}" aria-label="${ph}" value="${esc(S.lq)}">
+    ${S.lmode==="people"?`<div class="chips"><button class="chip" data-lgov aria-pressed="${S.lgov}">Former government jobs only</button></div>`:""}</div>
+  <div id="lresults"></div>`;
+}
+function lobResultsHTML(){
+  const rows=lobRows(),m=S.lmode;
+  const total={firms:L.firms.filter(f=>!f.h).length,house:L.firms.filter(f=>f.h).length,clients:L.clients.filter(c=>c.firms.length).length,people:L.lobs.length}[m];
+  const noun={firms:"firms",house:"organizations",clients:"clients",people:"lobbyists"}[m];
+  const fn={firms:firmRow,house:firmRow,clients:clientRow,people:lobbyistRow}[m];
+  const lead={firms:"Firms hired by clients to lobby, ranked by income they reported.",house:"Companies and groups whose own staff lobby, ranked by what they reported spending.",clients:"Who pays for lobbying, ranked by what firms reported receiving from them plus any in-house spending.",people:"Registered lobbyists named on these reports, A to Z by last name."}[m];
+  return `<div class="sub" style="padding-bottom:4px">${lead} ${rows.length.toLocaleString("en-US")} of ${total.toLocaleString("en-US")} ${noun} shown.</div>
+  ${rows.length?`<div>${rows.slice(0,S.llimit).map(fn).join("")}</div>${rows.length>S.llimit?`<div style="display:grid"><button class="chip more" data-lmore>Show 100 more</button></div>`:""}`:`<div class="empty">Nothing matches. Try a shorter search.</div>`}`;
+}
+function qbars(q){
+  const max=Math.max(...q,1);
+  return `<section style="display:grid;gap:6px"><h2>By quarter</h2><div class="qbars" role="img" aria-label="${L.meta.quarters.map((x,i)=>qName(x)+": "+lusd(q[i])).join(", ")}">${q.map((v,i)=>`<div class="qbar"><span>${v?usd(v):"–"}</span><i style="height:${Math.max(2,v/max*80).toFixed(0)}px"></i><span>${qName(L.meta.quarters[i])}</span></div>`).join("")}</div></section>`;
+}
+function renderLobSheet(root){
+  if(!L){S.lob=null;root.innerHTML="";return}
+  document.documentElement.style.overflow="hidden";
+  const kind=S.lob[0],ix=+S.lob.slice(1);
+  const qs=L.meta.quarters,span=`${qName(qs[0])} – ${qName(qs[qs.length-1])}`;
+  let label,name,body;
+  if(kind==="f"){
+    const f=L.firms[ix];name=f.n;
+    label=`<span>LOBBYING · ${f.h?"IN-HOUSE":"OUTSIDE FIRM"}</span><span>LDA ${f.id}</span>`;
+    const others=f.c.filter(x=>!x[3]);
+    body=`<div class="slab-body"><div class="slab-name">${esc(f.n)}</div><div class="meta">${f.st?esc(stName(f.st))+" · ":""}${f.h?"Lobbies for itself":"Lobbying firm"}</div>${f.d?`<div class="sub">${esc(f.d)}</div>`:""}
+      <div style="padding-top:8px"><div class="money">${f.t?full(f.t):"Under $5,000"}</div><div class="sub">${f.h?"reported spending on lobbying":"reported income from clients"}, ${span}</div></div></div></article>
+      ${qbars(f.q)}
+      ${f.i.length?`<section style="display:grid;gap:8px"><h2>Main issues</h2><div class="chips">${f.i.map(i=>`<span class="tag">${esc(i)}</span>`).join("")}</div></section>`:""}
+      ${others.length?`<section style="display:grid;gap:4px"><h2>Who pays this firm</h2><div class="sub">${others.length} ${others.length===1?"client":"clients"}. “Via another firm” means this firm was hired as a subcontractor.</div>${others.map(([c,a,sub])=>`<div class="giver"><span><button class="linkbtn" data-lob="c${c}">${esc(L.clients[c].n)}</button>${sub?` <span class="tag">Via another firm</span>`:""}</span><span>${a?full(a):"Under $5,000"}</span></div>`).join("")}</section>`:""}
+      ${f.u?`<div class="note">${f.u} ${f.u===1?"report":"reports"} listed under $5,000, which is shown as under $5,000 and counted as $0.</div>`:""}
+      <section style="display:grid;gap:4px"><h2>Lobbyists</h2><div class="sub">${f.l.length} named on this firm's reports. Former government jobs are as the lobbyist disclosed them.</div>${f.l.map(l=>L.lobById[l]).sort((a,b)=>a.last.localeCompare(b.last)).map(l=>`<div class="giver" style="display:grid;gap:2px;justify-content:stretch"><button class="linkbtn" data-lob="p${l.ix}">${esc(l.n)}</button>${l.pos?`<span class="pos" style="font-weight:400;white-space:normal">Former: ${esc(l.pos)}</span>`:""}</div>`).join("")||`<div class="note">No lobbyists were named.</div>`}</section>
+      <div class="note">From quarterly LD-2 reports. Amounts are rounded to the nearest $10,000. <a href="https://lda.gov/filings/public/filing/search/?registrant=${f.id}" target="_blank" rel="noopener">Open lda.gov's report search</a> with this registrant filled in.</div>`;
+  }else if(kind==="c"){
+    const c=L.clients[ix];name=c.n;
+    label=`<span>LOBBYING · CLIENT</span><span>${c.firms.length} ${c.firms.length===1?"REPORT LINE":"REPORT LINES"}</span>`;
+    const hired=c.firms.filter(x=>!x[3]),own=c.firms.filter(x=>x[3]);
+    body=`<div class="slab-body"><div class="slab-name">${esc(c.n)}</div>${c.d?`<div class="sub">${esc(c.d)}</div>`:""}
+      <div style="padding-top:8px"><div class="money">${c.t?full(c.t):"Under $5,000"}</div><div class="sub">reported, ${span}</div></div></div></article>
+      <div class="stats"><div class="stat"><div class="k">Paid to firms</div><div class="v">${usd(c.paid)}</div></div><div class="stat"><div class="k">Spent in-house</div><div class="v">${usd(c.own)}</div></div><div class="stat"><div class="k">Firms hired</div><div class="v">${hired.length}</div></div></div>
+      ${hired.length?`<section style="display:grid;gap:4px"><h2>Firms it hired</h2>${hired.map(([f,a,sub])=>`<div class="giver"><span><button class="linkbtn" data-lob="f${f}">${esc(L.firms[f].n)}</button>${sub?` <span class="tag">Subcontract</span>`:""}</span><span>${a?full(a):"Under $5,000"}</span></div>`).join("")}</section>`:""}
+      ${own.length?`<section style="display:grid;gap:4px"><h2>In-house lobbying</h2>${own.map(([f,a])=>`<div class="giver"><span><button class="linkbtn" data-lob="f${f}">${esc(L.firms[f].n)}</button></span><span>${a?full(a):"Under $5,000"}</span></div>`).join("")}</section>`:""}
+      <div class="note">Clients are matched by name across firms, so a parent company and its subsidiaries can appear separately. Subcontracts are left out of the total because the hiring firm's report already includes that money.${own.length&&hired.length?" An organization's in-house spending can include what it paid outside firms, so the two can overlap.":""}</div>`;
+  }else{
+    const l=L.lobById[ix];name=l.n;
+    label=`<span>LOBBYING · REGISTERED LOBBYIST</span><span>${l.firms.length} ${l.firms.length===1?"EMPLOYER":"EMPLOYERS"}</span>`;
+    body=`<div class="slab-body"><div class="slab-name">${esc(l.n)}</div>${l.pos?`<div class="sub">Former government jobs disclosed: ${esc(l.pos)}</div>`:`<div class="sub">No former government job disclosed on these reports.</div>`}</div></article>
+      <section style="display:grid;gap:4px"><h2>Lobbies for</h2><div class="sub">Firms or organizations whose reports name this lobbyist, ${span}.</div>${l.firms.map(f=>L.firms[f]).map(f=>`<div class="giver"><span><button class="linkbtn" data-lob="f${f.ix}">${esc(f.n)}</button></span><span>${lusd(f.t)}</span></div>`).join("")}</section>
+      <div class="note">The amount beside each name is that firm's or organization's total, not this person's pay.</div>`;
+  }
+  root.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(name)}" tabindex="-1"><div class="sheet-in">
+    <div class="sheet-top"><button class="back" data-close>‹ Back</button></div>
+    <article class="slab"><div class="slab-label">${label}</div>${body}
+  </div></div>`;
+  const sh=$(".sheet",root);sh.scrollTop=0;sh.focus();
+}
 async function boot(){
   $("#app").innerHTML='<div class="empty" style="margin-top:40px">Loading FEC filings…</div>';
   try{

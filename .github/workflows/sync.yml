@@ -8,7 +8,8 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/sync.yml"
-      - "scripts/**"
+      - "scripts/sync_fec.py"
+      - "scripts/name_overrides.json"
 
 permissions:
   contents: write
@@ -36,4 +37,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/candidates.json
           git diff --cached --quiet || git commit -m "Update FEC data"
+          git pull --rebase
           git push

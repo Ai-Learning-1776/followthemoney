@@ -1,0 +1,55 @@
+name: Sync lobbying data
+
+on:
+  schedule:
+    - cron: "41 8 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/lobbying.yml"
+      - "scripts/sync_lda.py"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: lobbying-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # The first download takes about four hours without an API key, so the
+      # reports are cached between runs and later runs only fetch new ones.
+      - name: Restore cached reports
+        uses: actions/cache/restore@v4
+        with:
+          path: .lda-cache
+          key: lda-${{ github.run_id }}
+          restore-keys: lda-
+      - name: Pull lobbying reports
+        env:
+          LDA_API_KEY: ${{ secrets.LDA_API_KEY }}
+          TIME_BUDGET_MIN: "300"
+        run: python scripts/sync_lda.py
+      - name: Save cached reports
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .lda-cache
+          key: lda-${{ github.run_id }}
+      - name: Save the new data
+        run: |
+          git config user.name "lobbying-sync-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/lobbying.json 2>/dev/null || true
+          git diff --cached --quiet || git commit -m "Update lobbying data"
+          git pull --rebase
+          git push
