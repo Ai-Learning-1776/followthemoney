@@ -178,10 +178,25 @@ def sync_type(c, y, q, ftype):
             return False
 
 
+NOT_ACRONYM = {"MR", "MRS", "MS", "DR", "ST", "JR", "SR", "MT", "FT", "MSGR"}
+DOTTED = re.compile(r"^(?:[A-Za-z]\.){2,}[A-Za-z]?\.?$")
+
+
+def acronym(part, people=False):
+    """True for parts like CTIA, U.S.A., RPLCC (no vowels) that should stay in capitals."""
+    bare = part.strip(",.()\"'")
+    if not bare:
+        return False
+    up = bare.upper()
+    if up in UPPER or DOTTED.match(bare):
+        return True
+    return not people and bare.isalpha() and 2 <= len(bare) <= 5 and not re.search(r"[AEIOUY]", up) and up not in NOT_ACRONYM
+
+
 SMALL = {"of", "and", "the", "for", "on", "in", "at", "to", "a", "an", "by"}
 UPPER = {"LLC", "LLP", "PLLC", "PC", "PA", "LP", "USA", "US", "U.S.", "DC", "D.C.", "II", "III", "IV", "PAC",
          "AFL-CIO", "AARP", "NRA", "IBM", "AT&T", "3M", "BGR", "CGCN", "FTI", "K&L", "LNG", "AI", "HHS", "DOD", "NASA",
-         "JP", "UPS", "CVS", "GE", "BP", "MITRE", "SIFMA", "PhRMA", "NCTA", "CTIA", "AHIP", "ACLU", "NAACP", "NEA"}
+         "JP", "TP", "UPS", "USAA", "AIPAC", "CTA", "SEIU", "AFSCME", "AMA", "AHA", "NAR", "NAM", "NFIB", "CVS", "GE", "BP", "MITRE", "SIFMA", "PhRMA", "NCTA", "CTIA", "AHIP", "ACLU", "NAACP", "NEA"}
 
 
 def cap(p):
@@ -190,8 +205,8 @@ def cap(p):
     return p if not m else p[:m.start()] + p[m.start()].upper() + p[m.start() + 1:].lower()
 
 
-def title(s):
-    s = " ".join((s or "").split())
+def title(s, people=False):
+    s = " ".join((s or "").split()).rstrip(" ,")
     if not s:
         return ""
     if s != s.upper() and s != s.lower():
@@ -199,12 +214,12 @@ def title(s):
     words = []
     for i, w in enumerate(s.split(" ")):
         bare = w.strip(",.()\"'")
-        if bare.upper() in UPPER or (len(bare) <= 3 and "." in bare) or ("&" in bare and len(bare) <= 5):
+        if acronym(w, people) or (len(bare) <= 3 and "." in bare) or ("&" in bare and len(bare) <= 5):
             words.append(w.upper().replace("PHRMA", "PhRMA"))
         elif i and w.lower() in SMALL:
             words.append(w.lower())
         else:
-            words.append("-".join(cap(p) for p in w.split("-")))
+            words.append("-".join(p.upper() if acronym(p, people) else cap(p) for p in w.split("-")))
     out = " ".join(words)
     out = re.sub(r"\b([OD])'([a-z])", lambda m: m.group(1) + "'" + m.group(2).upper(), out)
     out = re.sub(r"\bMc([a-z])", lambda m: "Mc" + m.group(1).upper(), out)
@@ -216,7 +231,8 @@ def person(l):
     first = l.get("nickname") or l.get("first_name") or ""
     parts = [first, l.get("last_name") or ""]
     suffix = l.get("suffix_display") or l.get("suffix") or ""
-    name = title(" ".join(p for p in parts if p))
+    name = title(" ".join(p for p in parts if p), people=True)
+    suffix = title(suffix, people=True)
     return f"{name} {suffix}".strip() if suffix and suffix.upper() not in ("NONE",) else name
 
 
@@ -264,6 +280,9 @@ def main():
     build(c, qs)
 
 
+SUSPECT = 5_000_000  # largest real single-client quarterly fees are around $1M
+
+
 def build(c, qs):
     qlabels = [f"{y}-Q{q}" for y, q in qs]
     firms, clients, lobbyists = {}, {}, {}
@@ -276,9 +295,12 @@ def build(c, qs):
         in_house = bool(self_select) or (inc is None and exp is not None)
         amount = (inc if inc is not None else exp) or 0
         firm = firms.setdefault(rid, {"id": int(rid), "n": title(rname), "st": rst, "d": rdesc,
-                                      "h": 0, "q": [0] * len(qs), "c": {}, "l": {}, "i": {}, "under": 0})
-        if in_house:
-            firm["h"] = 1
+                                      "own": 0, "paid": 0, "q": [0] * len(qs), "c": {}, "l": {}, "i": {},
+                                      "under": 0, "odd": 0})
+        if not in_house and amount > SUSPECT:
+            firm["odd"] += 1  # one client paying one firm this much in a quarter is almost certainly a filing error
+            amount = 0
+        firm["own" if in_house else "paid"] += amount
         firm["q"][qi] += amount
         if inc is None and exp is None:
             firm["under"] += 1
@@ -305,12 +327,13 @@ def build(c, qs):
     for f in firms.values():
         total = round(sum(f["q"]))
         out_firms.append({
-            "id": f["id"], "n": f["n"], "st": f["st"], "d": f["d"], "h": f["h"], "t": total,
+            "id": f["id"], "n": f["n"], "st": f["st"], "d": f["d"], "h": int(f["own"] > f["paid"]), "t": total,
             "q": [round(x) for x in f["q"]],
             "c": sorted([[c, round(a), s, h] for c, a, s, h in f["c"].values()], key=lambda x: -x[1]),
             "l": sorted(f["l"].keys()),
             "i": [k for k, _ in sorted(f["i"].items(), key=lambda x: -x[1])[:6]],
             "u": f["under"],
+            **({"x": f["odd"]} if f["odd"] else {}),
         })
     out_firms.sort(key=lambda x: -x["t"])
     data = {

@@ -138,7 +138,7 @@ function defaultWatch(){
 }
 const $=(s,r=document)=>r.querySelector(s);
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const usd=n=>{const a=Math.abs(n);if(a>=1e6)return "$"+(n/1e6).toFixed(a>=1e8?0:1)+"M";if(a>=1e3)return "$"+Math.round(n/1e3)+"K";return "$"+Math.round(n)};
+const usd=n=>{const a=Math.abs(n);if(a>=1e9)return "$"+(n/1e9).toFixed(a>=1e11?0:a>=1e10?1:2)+"B";if(a>=1e6)return "$"+(n/1e6).toFixed(a>=1e8?0:1)+"M";if(a>=1e3)return "$"+Math.round(n/1e3)+"K";return "$"+Math.round(n)};
 const full=n=>"$"+Math.round(n).toLocaleString("en-US");
 const pct=(a,b)=>b?(a/b*100):0;
 const dfmt=(s,o={month:"short",day:"numeric",year:"numeric"})=>new Date(s+"T12:00:00").toLocaleDateString("en-US",o);
@@ -424,6 +424,7 @@ function renderLobSheet(root){
       ${f.i.length?`<section style="display:grid;gap:8px"><h2>Main issues</h2><div class="chips">${f.i.map(i=>`<span class="tag">${esc(i)}</span>`).join("")}</div></section>`:""}
       ${others.length?`<section style="display:grid;gap:4px"><h2>Who pays this firm</h2><div class="sub">${others.length} ${others.length===1?"client":"clients"}. “Via another firm” means this firm was hired as a subcontractor.</div>${others.map(([c,a,sub])=>`<div class="giver"><span><button class="linkbtn" data-lob="c${c}">${esc(L.clients[c].n)}</button>${sub?` <span class="tag">Via another firm</span>`:""}</span><span>${a?full(a):"Under $5,000"}</span></div>`).join("")}</section>`:""}
       ${f.u?`<div class="note">${f.u} ${f.u===1?"report":"reports"} listed under $5,000, which is shown as under $5,000 and counted as $0.</div>`:""}
+      ${f.x?`<div class="note">${f.x} ${f.x===1?"report claims":"reports claim"} more than $5 million from one client in a single quarter. That is far beyond what any firm reports, so it's most likely a filing error and isn't counted in the totals.</div>`:""}
       <section style="display:grid;gap:4px"><h2>Lobbyists</h2><div class="sub">${f.l.length} named on this firm's reports. Former government jobs are as the lobbyist disclosed them.</div>${f.l.map(l=>L.lobById[l]).sort((a,b)=>a.last.localeCompare(b.last)).map(l=>`<div class="giver" style="display:grid;gap:2px;justify-content:stretch"><button class="linkbtn" data-lob="p${l.ix}">${esc(l.n)}</button>${l.pos?`<span class="pos" style="font-weight:400;white-space:normal">Former: ${esc(l.pos)}</span>`:""}</div>`).join("")||`<div class="note">No lobbyists were named.</div>`}</section>
       <div class="note">From quarterly LD-2 reports. Amounts are rounded to the nearest $10,000. <a href="https://lda.gov/filings/public/filing/search/?registrant=${f.id}" target="_blank" rel="noopener">Open lda.gov's report search</a> with this registrant filled in.</div>`;
   }else if(kind==="c"){
